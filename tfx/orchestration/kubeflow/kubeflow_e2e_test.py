@@ -44,7 +44,7 @@ from tfx.components.statistics_gen.component import StatisticsGen
 from tfx.components.trainer.component import Trainer
 from tfx.components.transform.component import Transform
 from tfx.orchestration import pipeline as tfx_pipeline
-from tfx.orchestration.kubeflow.runner import KubeflowRunner
+from tfx.orchestration.kubeflow import kubeflow_dag_runner
 from tfx.proto import evaluator_pb2
 from tfx.proto import pusher_pb2
 from tfx.proto import trainer_pb2
@@ -71,8 +71,7 @@ _TAXI_MODULE_FILE = os.environ['KFP_E2E_TAXI_MODULE_FILE']
 
 
 def _create_test_pipeline(pipeline_name: Text, pipeline_root: Text,
-                          csv_input_location: Text, taxi_module_file: Text,
-                          container_image: Text):
+                          csv_input_location: Text, taxi_module_file: Text):
   """Creates a simple Kubeflow-based Chicago Taxi TFX pipeline for testing.
 
   Args:
@@ -80,7 +79,6 @@ def _create_test_pipeline(pipeline_name: Text, pipeline_root: Text,
     pipeline_root: The root of the pipeline output.
     csv_input_location: The location of the input data directory.
     taxi_module_file: The location of the module file for Transform/Trainer.
-    container_image: The container image to use.
 
   Returns:
     A logical TFX pipeline.Pipeline object.
@@ -127,10 +125,6 @@ def _create_test_pipeline(pipeline_name: Text, pipeline_root: Text,
           example_gen, statistics_gen, infer_schema, validate_stats, transform,
           trainer, model_analyzer, model_validator, pusher
       ],
-      log_root='/var/tmp/tfx/logs',
-      additional_pipeline_args={
-          'tfx_image': container_image,
-      },
   )
 
 
@@ -247,6 +241,35 @@ class KubeflowEndToEndTest(tf.test.TestCase):
     blobs = bucket.list_blobs(prefix=prefix)
     bucket.delete_blobs(blobs)
 
+  def _delete_pipeline_metadata(self, pipeline_name: Text):
+    """Drops the database containing metadata produced by the pipeline.
+
+    Args:
+      pipeline_name: The name of the pipeline owning the database.
+    """
+    db_name = self._get_mlmd_db_name(pipeline_name)
+    command = [
+        'kubectl',
+        'exec',
+        '-it',
+        '$(kubectl get pods -l app=mysql --no-headers '
+        '-o custom-columns=:metadata.name)',
+        '--',
+        'mysql',
+        '--user',
+        'root',
+        '--execute',
+        '"drop database {};"'.format(db_name),
+    ]
+    tf.logging.info('Dropping MLMD DB with name: {}'.format(db_name))
+    subprocess.run(command, check=True)
+
+  def _get_mlmd_db_name(self, pipeline_name: Text):
+    # MySQL DB names must not contain '-' while k8s names must not contain '_'.
+    # So we replace the dashes here for the DB name.
+    valid_mysql_name = pipeline_name.replace('-', '_')
+    return 'mlmd_{}'.format(valid_mysql_name)
+
   def _compile_and_run_pipeline(self, pipeline_name: Text,
                                 pipeline: tfx_pipeline.Pipeline):
     """Compiles and runs a KFP pipeline.
@@ -255,7 +278,16 @@ class KubeflowEndToEndTest(tf.test.TestCase):
       pipeline_name: The name of the pipeline.
       pipeline: The logical pipeline to run.
     """
-    _ = KubeflowRunner().run(pipeline)
+    config = kubeflow_dag_runner.KubeflowRunnerConfig(
+        kubeflow_metadata_config={
+            'mysql_db_service_host_env_var': 'MYSQL_SERVICE_HOST',
+            'mysql_db_service_port_env_var': 'MYSQL_SERVICE_PORT',
+            'mysql_db_name': self._get_mlmd_db_name(pipeline_name),
+            'mysql_db_user': 'root',
+            'mysql_db_password': '',
+        },
+        tfx_image=self._container_image)
+    _ = kubeflow_dag_runner.KubeflowDagRunner(config=config).run(pipeline)
 
     file_path = os.path.join(self._test_dir, '{}.tar.gz'.format(pipeline_name))
     self.assertTrue(tf.gfile.Exists(file_path))
@@ -266,6 +298,7 @@ class KubeflowEndToEndTest(tf.test.TestCase):
     # Ensure cleanup regardless of whether pipeline succeeds or fails.
     self.addCleanup(self._delete_workflow, pipeline_name)
     self.addCleanup(self._delete_pipeline_output, pipeline_name)
+    self.addCleanup(self._delete_pipeline_metadata, pipeline_name)
 
     # Run the pipeline to completion.
     self._run_workflow(pipeline_file, pipeline_name)
@@ -293,8 +326,7 @@ class KubeflowEndToEndTest(tf.test.TestCase):
     pipeline_name = 'kubeflow-e2e-test-{}'.format(self._random_id())
     pipeline_root = os.path.join(self._test_output_dir, pipeline_name)
     pipeline = _create_test_pipeline(pipeline_name, pipeline_root,
-                                     self._data_root, self._taxi_module_file,
-                                     self._container_image)
+                                     self._data_root, self._taxi_module_file)
     self._compile_and_run_pipeline(pipeline_name, pipeline)
 
   # TODO(ajaygopinathan): Add test pipelines that exercise GCP extensions.

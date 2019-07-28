@@ -28,6 +28,8 @@
 *   Enables Transform and Trainer components to specify user defined function
     (UDF) module by Python module path in addition to path to a module file.
 *   Enable ImportExampleGen component for Kubeflow.
+*   Enables metadata logging and pipeline caching capability for Kubeflow
+    Pipelines.
 
 ## Bug fixes and other changes
 
@@ -184,4 +186,3 @@
 *   Adding instructions to refer to README when running Chicago Taxi notebooks
 
 ## Breaking changes
-
