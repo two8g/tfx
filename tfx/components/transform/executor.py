@@ -253,10 +253,17 @@ class Executor(base_executor.BaseExecutor):
             schema_file,
         labels.EXAMPLES_DATA_FORMAT_LABEL:
             labels.FORMAT_TF_EXAMPLE,
-        labels.ANALYZE_AND_TRANSFORM_DATA_PATHS_LABEL:
+        labels.ANALYZE_DATA_PATHS_LABEL:
             io_utils.all_files_pattern(train_data_uri),
-        labels.TRANSFORM_ONLY_DATA_PATHS_LABEL:
-            io_utils.all_files_pattern(eval_data_uri),
+        labels.ANALYZE_PATHS_FILE_FORMATS_LABEL:
+            labels.FORMAT_TFRECORD,
+        labels.TRANSFORM_DATA_PATHS_LABEL: [
+            io_utils.all_files_pattern(train_data_uri),
+            io_utils.all_files_pattern(eval_data_uri)
+        ],
+        labels.TRANSFORM_PATHS_FILE_FORMATS_LABEL: [
+            labels.FORMAT_TFRECORD, labels.FORMAT_TFRECORD
+        ],
         labels.TFT_STATISTICS_USE_TFDV_LABEL:
             True,
         labels.MODULE_FILE:
@@ -332,6 +339,9 @@ class Executor(base_executor.BaseExecutor):
     Returns:
       A PCollection containing KV pairs of exapmles.
     """
+    if dataset.file_format != labels.FORMAT_TFRECORD:
+      raise ValueError('Unsupported input file format: {}'.format(
+          dataset.file_format))
 
     result = (
         pipeline
@@ -353,19 +363,21 @@ class Executor(base_executor.BaseExecutor):
   @beam.typehints.with_input_types(
       beam.typehints.KV[bytes, example_pb2.Example])
   @beam.typehints.with_output_types(beam.pvalue.PDone)
-  def _WriteExamples(pcollection: beam.pvalue.PCollection,
-                     unused_file_format: Any,
+  def _WriteExamples(pcollection: beam.pvalue.PCollection, file_format: Text,
                      transformed_example_path: Text) -> beam.pvalue.PDone:
     """Writes transformed examples compressed in gzip format.
 
     Args:
       pcollection: PCollection of transformed examples.
-      unused_file_format: file format, unused.
+      file_format: The output file format.
       transformed_example_path: path to write to.
 
     Returns:
       beam.pvalue.PDone.
     """
+    if file_format != labels.FORMAT_TFRECORD:
+      raise ValueError('Unsupported output file format: {}'.format(file_format))
+
     return (pcollection
             | 'DropNoneKeys' >> beam.Values()
             | 'Write' >> beam.io.WriteToTFRecord(
@@ -676,12 +688,15 @@ class Executor(base_executor.BaseExecutor):
       inputs: A dictionary of labelled input values, including:
         - labels.COMPUTE_STATISTICS_LABEL: Whether compute statistics.
         - labels.SCHEMA_PATH_LABEL: Path to schema file.
-        - labels.EXAMPLES_FILE_FORMAT_LABEL: Example file format, optional.
         - labels.EXAMPLES_DATA_FORMAT_LABEL: Example data format.
-        - labels.ANALYZE_AND_TRANSFORM_DATA_PATHS_LABEL: Paths or path patterns
-          to analyze and transform data.
+        - labels.ANALYZE_DATA_PATHS_LABEL: Paths or path patterns to analyze
+          data.
+        - labels.ANALYZE_PATHS_FILE_FORMATS_LABEL: File formats of paths to
+          analyze data.
         - labels.TRANSFORM_DATA_PATHS_LABEL: Paths or path patterns to transform
-          only data.
+          data.
+        - labels.TRANSFORM_PATHS_FILE_FORMATS_LABEL: File formats of paths to
+          transform data.
         - labels.TFT_STATISTICS_USE_TFDV_LABEL: Whether use tfdv to compute
           statistics.
         - labels.MODULE_FILE: Path to a Python module that contains the
@@ -784,12 +799,14 @@ class Executor(base_executor.BaseExecutor):
     Returns:
       Status of the execution.
     """
-    raw_examples_file_format = common.GetSoleValue(
-        inputs, labels.EXAMPLES_FILE_FORMAT_LABEL, strict=False)
-    analyze_and_transform_data_paths = common.GetValues(
-        inputs, labels.ANALYZE_AND_TRANSFORM_DATA_PATHS_LABEL)
-    transform_only_data_paths = common.GetValues(
-        inputs, labels.TRANSFORM_ONLY_DATA_PATHS_LABEL)
+    analyze_data_paths = common.GetValues(inputs,
+                                          labels.ANALYZE_DATA_PATHS_LABEL)
+    analyze_paths_file_formats = common.GetValues(
+        inputs, labels.ANALYZE_PATHS_FILE_FORMATS_LABEL)
+    transform_data_paths = common.GetValues(inputs,
+                                            labels.TRANSFORM_DATA_PATHS_LABEL)
+    transform_paths_file_formats = common.GetValues(
+        inputs, labels.TRANSFORM_PATHS_FILE_FORMATS_LABEL)
     stats_use_tfdv = common.GetSoleValue(inputs,
                                          labels.TFT_STATISTICS_USE_TFDV_LABEL)
     per_set_stats_output_paths = common.GetValues(
@@ -801,13 +818,24 @@ class Executor(base_executor.BaseExecutor):
     output_cache_dir = common.GetSoleValue(
         outputs, labels.CACHE_OUTPUT_PATH_LABEL, strict=False)
 
-    tf.logging.info('Analyze and transform data patterns: %s',
-                    list(enumerate(analyze_and_transform_data_paths)))
+    tf.logging.info('Analyze data patterns: %s',
+                    list(enumerate(analyze_data_paths)))
     tf.logging.info('Transform data patterns: %s',
-                    list(enumerate(transform_only_data_paths)))
+                    list(enumerate(transform_data_paths)))
     tf.logging.info('Transform materialization output paths: %s',
                     list(enumerate(materialize_output_paths)))
     tf.logging.info('Transform output path: %s', transform_output_path)
+
+    if len(analyze_data_paths) != len(analyze_paths_file_formats):
+      return _Status.Error(
+          'size of analyze_data_paths and '
+          'analyze_paths_file_formats do not match: {} v.s {}'.format(
+              len(analyze_data_paths), len(analyze_paths_file_formats)))
+    if len(transform_data_paths) != len(transform_paths_file_formats):
+      return _Status.Error(
+          'size of transform_data_paths and '
+          'transform_paths_file_formats do not match: {} v.s {}'.format(
+              len(transform_data_paths), len(transform_paths_file_formats)))
 
     feature_spec = schema_utils.schema_as_feature_spec(
         _GetSchemaProto(input_dataset_metadata)).feature_spec
@@ -841,13 +869,13 @@ class Executor(base_executor.BaseExecutor):
 
     can_process_jointly = not bool(per_set_stats_output_paths or
                                    materialize_output_paths or output_cache_dir)
-    analyze_data_list = self._MakeDatasetList(
-        analyze_and_transform_data_paths, raw_examples_file_format,
-        raw_examples_data_format, analyze_input_dataset_metadata,
-        can_process_jointly)
+    analyze_data_list = self._MakeDatasetList(analyze_data_paths,
+                                              analyze_paths_file_formats,
+                                              raw_examples_data_format,
+                                              analyze_input_dataset_metadata,
+                                              can_process_jointly)
     transform_data_list = self._MakeDatasetList(
-        list(analyze_and_transform_data_paths) +
-        list(transform_only_data_paths), raw_examples_file_format,
+        transform_data_paths, transform_paths_file_formats,
         raw_examples_data_format, transform_input_dataset_metadata,
         can_process_jointly)
 
@@ -1046,7 +1074,7 @@ class Executor(base_executor.BaseExecutor):
             for (idx, (dataset, output_path)) in enumerate(bundles):
               (dataset.transformed_and_encoded
                | 'Materialize[{}]'.format(idx) >> self._WriteExamples(
-                   raw_examples_file_format, output_path))
+                   transform_paths_file_formats[-1], output_path))
 
     return _Status.OK()
 
@@ -1122,8 +1150,8 @@ class Executor(base_executor.BaseExecutor):
 
   # TODO(b/114444977): Remove the unused_can_process_jointly argument and
   # perhaps the need for this entire function.
-  def _MakeDatasetList(self, file_patterns: Sequence[Text], file_format: Text,
-                       data_format: Text,
+  def _MakeDatasetList(self, file_patterns: Sequence[Text],
+                       file_formats: Sequence[Text], data_format: Text,
                        metadata: dataset_metadata.DatasetMetadata,
                        unused_can_process_jointly: bool) -> List[_Dataset]:
     """Makes a list of Dataset from the given `file_patterns`.
@@ -1131,7 +1159,8 @@ class Executor(base_executor.BaseExecutor):
     Args:
       file_patterns: A list of file patterns where each pattern corresponds to
         one `_Dataset`.
-      file_format: The file format of the datasets.
+      file_formats: A list of file format where each format corresponds to one
+        `_Dataset`. Must have the same size as `file_patterns`.
       data_format: The data format of the datasets.
       metadata: A DatasetMetadata object for the datasets.
       unused_can_process_jointly: Whether paths can be processed jointly,
@@ -1143,7 +1172,8 @@ class Executor(base_executor.BaseExecutor):
 
     # File patterns will need to be processed independently.
     return [
-        _Dataset(p, file_format, data_format, metadata) for p in file_patterns
+        _Dataset(p, f, data_format, metadata)
+        for p, f in zip(file_patterns, file_formats)
     ]
 
   @staticmethod
