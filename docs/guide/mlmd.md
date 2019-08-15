@@ -29,8 +29,9 @@ following list provides a non-exhaustive overview of some of the major benefits.
     trained.
 *   **Load two Artifacts of the same type for comparison**, e.g. to compare
     results from two experiments.
-*   **Show a DAG of all executions and their input and output artifacts**, e.g.
-    to visualize the workflow for debugging and discovery.
+*   **Show a DAG of all related executions and their input and output artifacts
+    of a context**, e.g. to visualize the workflow of an experiment for
+    debugging and discovery.
 *   **Recurse back through all events to see how an artifact was created**, e.g.
     to see what data went into a model, or to enforce data retention plans.
 *   **Identify all artifacts that were created using a given artifact**, e.g. to
@@ -39,6 +40,9 @@ following list provides a non-exhaustive overview of some of the major benefits.
 *   **Determine if an execution has been run on the same inputs before**, e.g.
     to determine whether a component/step has already completed the same work
     and the previous output can just be reused.
+*   **Record and query context of workflow runs**, e.g., to track the owner and
+    changelist used for a workflow run; to group the lineage by experiments; to
+    manage artifacts by projects.
 *   Etc.
 
 ## Metadata Storage Backends and Store Connection Configuration
@@ -76,3 +80,31 @@ connection_config.mysql.user = '...'
 connection_config.mysql.password = '...'
 store = metadata_store.MetadataStore(connection_config)
 ```
+
+### Upgrade MLMD library
+
+When using a new MLMD release or your own build with an existing MLMD database,
+there may be database schema changes. Unless breaking change is explicitly
+mentioned in the release note, all MLMD database schema changes are transparent
+for the MLMD API users.
+
+When using a MLMD library connects to the database, it compares the expected
+schema version of the MLMD library (`library_version`) with the schema version
+(`db_version`) recorded in the given database.
+
+*   If `library_version` is compatible with `db_version`, nothing happens.
+*   If `library_version` is newer than `db_version`, it runs a single migration
+    transaction to evolve the database by executing a series of migration
+    schemes. The migration scheme is provided together with any schema change
+    commit and enforced by change reviews and verified by continuous tests.
+
+    NOTE: If the migration transaction has errors, the transaction will rollback
+    and keep the original database unchanged. If this case happens, it is
+    possible that other concurrent transaction ran in the same database, or the
+    migration scheme's test fails to capture all cases. If it is the latter
+    case, please report issues for a fix or downgrade library to work with the
+    database.
+
+*   If `library_version` is older than `db_version`, MLMD library returns errors
+    to prevent any data loss. In this case, the user should upgrade the library
+    version before using that database.
