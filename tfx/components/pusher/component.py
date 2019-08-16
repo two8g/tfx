@@ -16,11 +16,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from typing import Any, Dict, Optional, Text, Type
+from typing import Any, Dict, Optional, Text
 
 from tfx import types
 from tfx.components.base import base_component
-from tfx.components.base import base_executor
 from tfx.components.pusher import executor
 from tfx.proto import pusher_pb2
 from tfx.types import standard_artifacts
@@ -37,18 +36,17 @@ class Pusher(base_component.BaseComponent):
   """
 
   SPEC_CLASS = PusherSpec
-  EXECUTOR_CLASS = executor.Executor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(executor_class=executor.Executor)
 
-  def __init__(
-      self,
-      model_export: types.Channel = None,
-      model_blessing: types.Channel = None,
-      push_destination: Optional[pusher_pb2.PushDestination] = None,
-      custom_config: Optional[Dict[Text, Any]] = None,
-      executor_class: Optional[Type[base_executor.BaseExecutor]] = None,
-      model_push: Optional[types.Channel] = None,
-      model: Optional[types.Channel] = None,
-      name: Optional[Text] = None):
+  def __init__(self,
+               model_export: types.Channel = None,
+               model_blessing: types.Channel = None,
+               push_destination: Optional[pusher_pb2.PushDestination] = None,
+               custom_config: Optional[Dict[Text, Any]] = None,
+               executor_spec: Optional[base_component.ExecutorSpec] = None,
+               model_push: Optional[types.Channel] = None,
+               model: Optional[types.Channel] = None,
+               name: Optional[Text] = None):
     """Construct a Pusher component.
 
     Args:
@@ -63,7 +61,7 @@ class Pusher(base_component.BaseComponent):
         passed to Google Cloud ML Engine.  For the full set of parameters
         supported by Google Cloud ML Engine, refer to
         https://cloud.google.com/ml-engine/reference/rest/v1/projects.models
-      executor_class: Optional custom python executor class.
+      executor_spec: Optional custom executor spec.
       model_push: Optional output 'ModelPushPath' channel with result of push.
       model: Forwards compatibility alias for the 'model_exports' argument.
       name: Optional unique name. Necessary if multiple Pusher components are
@@ -73,9 +71,9 @@ class Pusher(base_component.BaseComponent):
     model_push = model_push or types.Channel(
         type=standard_artifacts.PushedModel,
         artifacts=[standard_artifacts.PushedModel()])
-    if push_destination is None and not executor_class:
+    if push_destination is None and not executor_spec:
       raise ValueError('push_destination is required unless a custom '
-                       'executor_class is supplied that does not require '
+                       'executor_spec is supplied that does not require '
                        'it.')
     spec = PusherSpec(
         model_export=model_export,
@@ -83,6 +81,5 @@ class Pusher(base_component.BaseComponent):
         push_destination=push_destination,
         custom_config=custom_config,
         model_push=model_push)
-    super(Pusher, self).__init__(spec=spec,
-                                 custom_executor_class=executor_class,
-                                 name=name)
+    super(Pusher, self).__init__(
+        spec=spec, custom_executor_spec=executor_spec, name=name)

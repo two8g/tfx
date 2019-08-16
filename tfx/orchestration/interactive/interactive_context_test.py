@@ -47,7 +47,7 @@ class InteractiveContextTest(tf.test.TestCase):
 
     class _FakeComponent(base_component.BaseComponent):
       SPEC_CLASS = _FakeComponentSpec
-      EXECUTOR_CLASS = _FakeExecutor
+      EXECUTOR_SPEC = base_component.ExecutorSpec(executor_class=_FakeExecutor)
 
       def __init__(self, spec: types.ComponentSpec):
         super(_FakeComponent, self).__init__(spec=spec)
@@ -75,7 +75,7 @@ class InteractiveContextTest(tf.test.TestCase):
 
     class _FakeComponent(base_component.BaseComponent):
       SPEC_CLASS = _FakeComponentSpec
-      EXECUTOR_CLASS = _FakeExecutor
+      EXECUTOR_SPEC = base_component.ExecutorSpec(executor_class=_FakeExecutor)
 
       def __init__(self, spec: types.ComponentSpec):
         super(_FakeComponent, self).__init__(spec=spec)

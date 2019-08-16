@@ -34,7 +34,7 @@ class StatisticsGen(base_component.BaseComponent):
   """
 
   SPEC_CLASS = StatisticsGenSpec
-  EXECUTOR_CLASS = executor.Executor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(executor_class=executor.Executor)
 
   def __init__(self,
                input_data: types.Channel = None,

@@ -38,7 +38,7 @@ class ModelValidator(base_component.BaseComponent):
   """
 
   SPEC_CLASS = ModelValidatorSpec
-  EXECUTOR_CLASS = executor.Executor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(executor_class=executor.Executor)
   DRIVER_CLASS = driver.Driver
 
   def __init__(self,

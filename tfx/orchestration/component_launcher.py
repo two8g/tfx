@@ -57,7 +57,7 @@ class ComponentLauncher(object):
     self._driver_args = driver_args
 
     self._driver_class = component.driver_class
-    self._executor_class = component.executor_class
+    self._executor_class = component.executor_spec.executor_class
 
     self._input_dict = component.inputs.get_all()
     self._output_dict = component.outputs.get_all()

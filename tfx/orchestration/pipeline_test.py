@@ -47,7 +47,8 @@ def _make_fake_component_instance(name: Text, inputs: Dict[Text, types.Channel],
   class _FakeComponent(base_component.BaseComponent):
 
     SPEC_CLASS = _FakeComponentSpec
-    EXECUTOR_CLASS = base_executor.BaseExecutor
+    EXECUTOR_SPEC = base_component.ExecutorSpec(
+        executor_class=base_executor.BaseExecutor)
 
     def __init__(self, name: Text, spec_kwargs: Dict[Text, Any]):
       spec = _FakeComponentSpec(

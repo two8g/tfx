@@ -74,7 +74,7 @@ class _FakeComponentSpec(types.ComponentSpec):
 
 class _FakeComponent(base_component.BaseComponent):
   SPEC_CLASS = _FakeComponentSpec
-  EXECUTOR_CLASS = _FakeExecutor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(executor_class=_FakeExecutor)
   DRIVER_CLASS = _FakeDriver
 
   def __init__(self,

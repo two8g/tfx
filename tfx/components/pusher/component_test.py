@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tfx.components.base import base_component
 from tfx.components.pusher import component
 from tfx.components.pusher import executor
 from tfx.proto import pusher_pb2
@@ -57,7 +58,8 @@ class ComponentTest(tf.test.TestCase):
     pusher = component.Pusher(
         model_export=self.model_export,
         model_blessing=self.model_blessing,
-        executor_class=self._MyCustomPusherExecutor,
+        executor_spec=base_component.ExecutorSpec(
+            executor_class=self._MyCustomPusherExecutor),
     )
     self.assertEqual('ModelPushPath', pusher.outputs.model_push.type_name)
 

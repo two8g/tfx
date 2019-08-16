@@ -155,9 +155,10 @@ class KubeflowDagRunner(tfx_runner.TfxRunner):
         else:
           input_dict[input_name] = json.dumps(
               [x.json_dict() for x in input_channel.get()])
-      executor_class_path = '.'.join(
-          [component.executor_class.__module__,
-           component.executor_class.__name__])
+      executor_class_path = '.'.join([
+          component.executor_spec.executor_class.__module__,
+          component.executor_spec.executor_class.__name__
+      ])
       kfp_component = base_component.BaseComponent(
           component_name=component.component_name,
           input_dict=input_dict,

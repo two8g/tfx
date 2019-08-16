@@ -20,6 +20,7 @@ from __future__ import print_function
 import tensorflow as tf
 from google.protobuf import any_pb2
 from google.protobuf import json_format
+from tfx.components.base import base_component
 from tfx.components.base import base_driver
 from tfx.components.example_gen import base_example_gen_executor
 from tfx.components.example_gen import component
@@ -37,7 +38,8 @@ class TestExampleGenExecutor(base_example_gen_executor.BaseExampleGenExecutor):
 
 class TestQueryBasedExampleGenComponent(component._QueryBasedExampleGen):
 
-  EXECUTOR_CLASS = TestExampleGenExecutor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(
+      executor_class=TestExampleGenExecutor)
 
   def __init__(self,
                input_config,
@@ -53,7 +55,8 @@ class TestQueryBasedExampleGenComponent(component._QueryBasedExampleGen):
 
 class TestFileBasedExampleGenComponent(component.FileBasedExampleGen):
 
-  EXECUTOR_CLASS = TestExampleGenExecutor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(
+      executor_class=TestExampleGenExecutor)
 
   def __init__(self,
                input_base,
@@ -100,7 +103,8 @@ class ComponentTest(tf.test.TestCase):
     input_base = standard_artifacts.ExternalArtifact()
     example_gen = component.FileBasedExampleGen(
         input_base=channel_utils.as_channel([input_base]),
-        executor_class=TestExampleGenExecutor)
+        executor_spec=base_component.ExecutorSpec(
+            executor_class=TestExampleGenExecutor))
     self.assertEqual(driver.Driver, example_gen.driver_class)
     self.assertEqual('ExamplesPath', example_gen.outputs.examples.type_name)
     artifact_collection = example_gen.outputs.examples.get()
@@ -144,7 +148,8 @@ class ComponentTest(tf.test.TestCase):
     example_gen = component.FileBasedExampleGen(
         input_base=channel_utils.as_channel([input_base]),
         custom_config=custom_config,
-        executor_class=TestExampleGenExecutor)
+        executor_spec=base_component.ExecutorSpec(
+            executor_class=TestExampleGenExecutor))
 
     stored_custom_config = example_gen_pb2.CustomConfig()
     json_format.Parse(example_gen.exec_properties['custom_config'],

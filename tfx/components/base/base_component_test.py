@@ -25,6 +25,9 @@ from tfx.proto import example_gen_pb2
 from tfx.types.component_spec import ChannelParameter
 from tfx.types.component_spec import ExecutionParameter
 
+_BASE_EXECUTOR_SPEC = base_component.ExecutorSpec(
+    executor_class=base_executor.BaseExecutor)
+
 
 class _BasicComponentSpec(types.ComponentSpec):
 
@@ -44,7 +47,7 @@ class _BasicComponent(base_component.BaseComponent):
 
   COMPONENT_NAME = 'MyBasicComponent'
   SPEC_CLASS = _BasicComponentSpec
-  EXECUTOR_CLASS = base_executor.BaseExecutor
+  EXECUTOR_SPEC = _BASE_EXECUTOR_SPEC
 
   def __init__(self,
                spec: types.ComponentSpec = None,
@@ -78,7 +81,7 @@ class ComponentTest(tf.test.TestCase):
 
     class MissingSpecComponent(base_component.BaseComponent):
 
-      EXECUTOR_CLASS = base_executor.BaseExecutor
+      EXECUTOR_SPEC = _BASE_EXECUTOR_SPEC
 
     with self.assertRaisesRegexp(
         TypeError,
@@ -93,7 +96,7 @@ class ComponentTest(tf.test.TestCase):
     class InvalidSpecComponent(base_component.BaseComponent):
 
       SPEC_CLASSES = object()
-      EXECUTOR_CLASS = base_executor.BaseExecutor
+      EXECUTOR_SPEC = _BASE_EXECUTOR_SPEC
 
     with self.assertRaisesRegexp(
         TypeError, 'expects SPEC_CLASS property to be a subclass of '
@@ -112,20 +115,18 @@ class ComponentTest(tf.test.TestCase):
       MissingExecutorComponent(spec=object())  # pytype: disable=wrong-arg-types
 
     with self.assertRaisesRegexp(
-        TypeError,
-        'expects EXECUTOR_CLASS property to be a subclass of '
-        'base_executor.BaseExecutor'):
+        TypeError, 'expects EXECUTOR_SPEC property to be an instance of '
+        'ExecutorSpec'):
       MissingExecutorComponent._validate_component_class()
 
     class InvalidExecutorComponent(base_component.BaseComponent):
 
       SPEC_CLASS = _BasicComponentSpec
-      EXECUTOR_CLASS = object()
+      EXECUTOR_SPEC = object()
 
     with self.assertRaisesRegexp(
-        TypeError,
-        'expects EXECUTOR_CLASS property to be a subclass of '
-        'base_executor.BaseExecutor'):
+        TypeError, 'expects EXECUTOR_SPEC property to be an instance of '
+        'ExecutorSpec'):
       InvalidExecutorComponent._validate_component_class()
 
   def testComponentCustomExecutor(self):
@@ -138,29 +139,28 @@ class ComponentTest(tf.test.TestCase):
     class MyComponent(base_component.BaseComponent):
 
       SPEC_CLASS = EmptyComponentSpec
-      EXECUTOR_CLASS = base_executor.BaseExecutor
+      EXECUTOR_SPEC = _BASE_EXECUTOR_SPEC
 
     class MyCustomExecutor(base_executor.BaseExecutor):
       pass
 
     custom_executor_component = MyComponent(
         spec=EmptyComponentSpec(),
-        custom_executor_class=MyCustomExecutor)
-    self.assertEqual(custom_executor_component.executor_class, MyCustomExecutor)
+        custom_executor_spec=base_component.ExecutorSpec(
+            executor_class=MyCustomExecutor))
+    self.assertEqual(custom_executor_component.executor_spec.executor_class,
+                     MyCustomExecutor)
 
-    with self.assertRaisesRegexp(
-        TypeError,
-        'should be a subclass of base_executor.BaseExecutor'):
-      MyComponent(
-          spec=EmptyComponentSpec(),
-          custom_executor_class=object)
+    with self.assertRaisesRegexp(TypeError,
+                                 'should be an instance of ExecutorSpec'):
+      MyComponent(spec=EmptyComponentSpec(), custom_executor_spec=object)
 
   def testComponentDriverClass(self):
 
     class InvalidDriverComponent(base_component.BaseComponent):
 
       SPEC_CLASS = _BasicComponentSpec
-      EXECUTOR_CLASS = base_executor.BaseExecutor
+      EXECUTOR_SPEC = _BASE_EXECUTOR_SPEC
       DRIVER_CLASS = object()
 
     with self.assertRaisesRegexp(

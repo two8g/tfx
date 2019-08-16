@@ -34,7 +34,7 @@ class Evaluator(base_component.BaseComponent):
   """
 
   SPEC_CLASS = EvaluatorSpec
-  EXECUTOR_CLASS = executor.Executor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(executor_class=executor.Executor)
 
   def __init__(
       self,

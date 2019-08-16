@@ -43,7 +43,8 @@ class _FakeComponentSpec(types.ComponentSpec):
 class _FakeComponent(base_component.BaseComponent):
 
   SPEC_CLASS = types.ComponentSpec
-  EXECUTOR_CLASS = base_executor.BaseExecutor
+  EXECUTOR_SPEC = base_component.ExecutorSpec(
+      executor_class=base_executor.BaseExecutor)
 
   def __init__(self, spec: types.ComponentSpec):
     super(_FakeComponent, self).__init__(spec=spec)
