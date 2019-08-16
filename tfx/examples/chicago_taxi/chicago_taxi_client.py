@@ -28,7 +28,7 @@ import requests
 import tensorflow as tf
 
 from tensorflow.python.lib.io import file_io  # pylint: disable=g-direct-tensorflow-import
-from tfx.examples.chicago_taxi.trainer import taxi
+from trainer import taxi
 
 _LOCAL_INFERENCE_TIMEOUT_SECONDS = 5.0
 

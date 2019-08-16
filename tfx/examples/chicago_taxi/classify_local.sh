@@ -20,4 +20,4 @@ python chicago_taxi_client.py \
   --num_examples 3 \
   --examples_file ./data/train/data.csv \
   --schema_file ./data/local_tfdv_output/schema.pbtxt \
-  --server 127.0.0.1:9000
+  --server 127.0.0.1:19000

@@ -23,9 +23,10 @@ import tensorflow_model_analysis as tfma
 from tensorflow_transform.beam.tft_beam_io import transform_fn_io
 from tensorflow_transform.saved import saved_transform_io
 from tensorflow_transform.tf_metadata import metadata_io
-from tfx.examples.chicago_taxi.trainer import taxi
+from trainer import taxi
 
-
+# 使用预定义的DNNLinearCombinedClassifier, 也可以通过Estimator API自定义模型
+# https://www.tensorflow.org/guide/estimators
 def build_estimator(tf_transform_dir, config, hidden_units=None):
   """Build an estimator for predicting the tipping behavior of taxi riders.
 

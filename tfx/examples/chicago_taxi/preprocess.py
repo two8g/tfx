@@ -150,6 +150,8 @@ def transform_data(input_handle,
         decode_transform = beam.Map(
             taxi.clean_raw_data_dict, raw_feature_spec=raw_feature_spec)
 
+      # transform_dir没有定义时用preprocessing_fn进行transform，并把WriteTransformFn
+      # transform_dir有定义时读入transform_dir的
       if transform_dir is None:
         decoded_data = raw_data | 'DecodeForAnalyze' >> decode_transform
         transform_fn = (

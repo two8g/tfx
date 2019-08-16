@@ -15,6 +15,10 @@
 set -u
 
 echo Starting local TFT preprocessing...
+#将数据分为训练集train和校验集eval。
+#对训练数据进行transform
+#然后根据transform的统计信息对eval进行transform
+#最终得到用于模型训练和校验的训练数据和校验数据
 
 # Preprocess the train files, keeping the transform functions
 echo Preprocessing train data...

@@ -41,14 +41,14 @@ echo Starting the Model Server to serve from: $LOCAL_MODEL_DIR
 CONTAINER_MODEL_DIR=/models/chicago_taxi
 
 # Local port where to send inference requests
-HOST_PORT=9000
+HOST_PORT=19000
 
 # Where our container is listening
 CONTAINER_PORT=8501
 
 echo Model directory: $LOCAL_MODEL_DIR
 
-docker run -it\
+docker run -d -it\
   -p 127.0.0.1:$HOST_PORT:$CONTAINER_PORT \
   -v $LOCAL_MODEL_DIR:$CONTAINER_MODEL_DIR \
   -e MODEL_NAME=chicago_taxi \
